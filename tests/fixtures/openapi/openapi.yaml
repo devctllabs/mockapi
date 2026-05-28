@@ -1,0 +1,16 @@
+openapi: 3.1.0
+info:
+  title: Test Mock API
+  version: 0.1.0
+servers:
+  - url: /api/v1
+paths:
+  /workspaces:
+    $ref: './domains/workspaces.yaml#/paths/workspaces'
+components:
+  schemas:
+    Workspace:
+      $ref: './domains/workspaces.yaml#/components/schemas/Workspace'
+  parameters:
+    WorkspaceId:
+      $ref: './shared/components.yaml#/components/parameters/WorkspaceId'

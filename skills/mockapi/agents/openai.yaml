@@ -1,0 +1,4 @@
+interface:
+  display_name: "mockapi"
+  short_description: "Create stateful mock API servers"
+  default_prompt: "Use $mockapi api/openapi.yaml to create a stateful mock server."
