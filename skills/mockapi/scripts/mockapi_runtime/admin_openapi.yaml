@@ -1,0 +1,113 @@
+openapi: 3.1.0
+info:
+  title: __MOCKAPI_ADMIN_API_TITLE__
+  version: 0.1.0
+paths:
+  /__mock/health:
+    get:
+      operationId: mockHealth
+      responses:
+        '200':
+          description: Mock server health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockHealth'
+  /__mock/reset:
+    post:
+      operationId: mockResetState
+      responses:
+        '200':
+          description: Reset state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockState'
+  /__mock/state:
+    get:
+      operationId: mockGetState
+      responses:
+        '200':
+          description: Current state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockState'
+    put:
+      operationId: mockPutState
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MockState'
+      responses:
+        '200':
+          description: Replaced state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockState'
+  /__mock/snapshot:
+    get:
+      operationId: mockGetSnapshot
+      responses:
+        '200':
+          description: Current state snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockState'
+    post:
+      operationId: mockPostSnapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MockState'
+      responses:
+        '200':
+          description: Stored state snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockState'
+  /__mock/clock:
+    put:
+      operationId: mockPutClock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MockClock'
+      responses:
+        '200':
+          description: Updated clock
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockClock'
+components:
+  schemas:
+    MockHealth:
+      type: object
+      required: [ok, operationCount]
+      properties:
+        ok:
+          type: boolean
+        operationCount:
+          type: integer
+        serverName:
+          type: string
+        version:
+          type: string
+    MockClock:
+      type: object
+      required: [now]
+      properties:
+        now:
+          type: string
+          format: date-time
+__MOCKAPI_ADMIN_MOCK_STATE_SCHEMAS__

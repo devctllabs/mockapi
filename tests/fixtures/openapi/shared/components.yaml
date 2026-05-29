@@ -1,0 +1,18 @@
+components:
+  parameters:
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
+      description: Workspace identifier.
+  schemas:
+    Id:
+      type: string
+      minLength: 1
+      example: workspace-1
+    DateTime:
+      type: string
+      format: date-time
+      example: '2026-05-15T12:00:00.000Z'

@@ -1,0 +1,33 @@
+paths:
+  workspaces:
+    get:
+      operationId: listWorkspaces
+      tags:
+        - Workspaces
+      summary: List workspaces.
+      responses:
+        '200':
+          description: Workspaces.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Workspace'
+components:
+  schemas:
+    Workspace:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - updatedAt
+      properties:
+        id:
+          $ref: '../shared/components.yaml#/components/schemas/Id'
+        title:
+          type: string
+          minLength: 1
+        updatedAt:
+          $ref: '../shared/components.yaml#/components/schemas/DateTime'
