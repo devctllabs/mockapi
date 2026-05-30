@@ -2,17 +2,27 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from typing import Iterable
 
 from tests.support import MemoryFileSystem, PROJECT_ROOT, profile_toml
 
+from mockapi_runtime.diagnostics import Diagnostic
 from mockapi_runtime.quality import check_generated_quality, format_quality_result
 
 
 PACKAGE_ROOT = PROJECT_ROOT / "mock-server"
 
 
-def diagnostic_ids(diagnostics: list[dict[str, str]]) -> set[str]:
+def diagnostic_ids(diagnostics: Iterable[Diagnostic]) -> set[str]:
     return {diagnostic["id"] for diagnostic in diagnostics}
+
+
+def diagnostic_paths(diagnostics: Iterable[Diagnostic], diagnostic_id: str) -> set[str]:
+    paths: set[str] = set()
+    for diagnostic in diagnostics:
+        if diagnostic["id"] == diagnostic_id and "path" in diagnostic:
+            paths.add(diagnostic["path"])
+    return paths
 
 
 class GeneratedQualityTests(unittest.TestCase):
@@ -361,6 +371,83 @@ export const seedShared = (): Pick<MockState, 'idCounters'> => ({ idCounters: {}
         result = self.check()
 
         self.assertNotIn("quality.tests.missingBasePathSmoke", diagnostic_ids(result.warnings))
+
+    def test_warns_when_feature_source_has_no_adjacent_unit_test(self) -> None:
+        self.add_package_file("src/app.test.ts", "test('custom basePath', () => {})\n")
+        self.add_package_file("src/features/workspaces/service.ts", "export class WorkspaceService {}\n")
+
+        result = self.check()
+
+        warning = next(
+            diagnostic
+            for diagnostic in result.warnings
+            if diagnostic["id"] == "quality.tests.missingFeatureUnit"
+        )
+        self.assertEqual(warning["path"], "src/features/workspaces/service.test.ts")
+        self.assertIn("adjacent unit test", warning["message"])
+
+    def test_accepts_adjacent_feature_unit_test(self) -> None:
+        self.add_package_file("src/app.test.ts", "test('custom basePath', () => {})\n")
+        self.add_package_file("src/features/workspaces/service.ts", "export class WorkspaceService {}\n")
+        self.add_package_file("src/features/workspaces/service.test.ts", "test('service behavior', () => {})\n")
+
+        result = self.check()
+
+        self.assertNotIn("quality.tests.missingFeatureUnit", diagnostic_ids(result.warnings))
+
+    def test_accepts_adjacent_feature_spec_test(self) -> None:
+        self.add_package_file("src/app.test.ts", "test('custom basePath', () => {})\n")
+        self.add_package_file("src/features/workspaces/service.ts", "export class WorkspaceService {}\n")
+        self.add_package_file("src/features/workspaces/service.spec.ts", "test('service behavior', () => {})\n")
+
+        result = self.check()
+
+        self.assertNotIn("quality.tests.missingFeatureUnit", diagnostic_ids(result.warnings))
+
+    def test_warns_when_feature_repository_has_no_adjacent_unit_test(self) -> None:
+        self.add_package_file("src/app.test.ts", "test('custom basePath', () => {})\n")
+        self.add_package_file("src/features/workspaces/repository.ts", "export class WorkspacesRepository {}\n")
+
+        result = self.check()
+
+        self.assertIn(
+            "src/features/workspaces/repository.test.ts",
+            diagnostic_paths(result.warnings, "quality.tests.missingFeatureUnit"),
+        )
+
+    def test_warns_when_feature_helper_has_no_adjacent_unit_test(self) -> None:
+        self.add_package_file("src/app.test.ts", "test('custom basePath', () => {})\n")
+        self.add_package_file("src/features/workspaces/sortRules.ts", "export const byName = () => 0\n")
+
+        result = self.check()
+
+        self.assertIn(
+            "src/features/workspaces/sortRules.test.ts",
+            diagnostic_paths(result.warnings, "quality.tests.missingFeatureUnit"),
+        )
+
+    def test_feature_unit_warning_ignores_generated_adapters_and_seed(self) -> None:
+        self.add_package_file("src/app.test.ts", "test('custom basePath', () => {})\n")
+        self.add_package_file("src/features/workspaces/seed.ts", "export const seedWorkspaces = () => ({})\n")
+        self.add_package_file("src/features/workspaces/controllers/listWorkspaces.ts", "export const listWorkspaces = () => ({})\n")
+
+        result = self.check()
+
+        self.assertNotIn("quality.tests.missingFeatureUnit", diagnostic_ids(result.warnings))
+
+    def test_feature_unit_warning_ignores_metadata_and_incomplete_sources(self) -> None:
+        self.add_package_file("src/app.test.ts", "test('custom basePath', () => {})\n")
+        self.add_package_file("src/features/workspaces/index.ts", "export * from './service.ts'\n")
+        self.add_package_file("src/features/workspaces/types.ts", "export type WorkspaceId = string\n")
+        self.add_package_file("src/features/workspaces/model.d.ts", "export type Workspace = { id: string }\n")
+        self.add_package_file(
+            "src/features/workspaces/service.ts",
+            "throw new Error('TODO mockapi: implement service')\n",
+        )
+
+        result = self.check()
+
+        self.assertNotIn("quality.tests.missingFeatureUnit", diagnostic_ids(result.warnings))
 
     def test_formats_every_error_and_warning(self) -> None:
         self.add_package_file(
