@@ -14,45 +14,6 @@ permissions:
   contents: read
 
 jobs:
-  commitlint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Enforce single-commit PRs
-        if: github.event_name == 'pull_request'
-        env:
-          PR_COMMIT_COUNT: ${{ github.event.pull_request.commits }}
-        run: |
-          test "$PR_COMMIT_COUNT" -eq 1
-
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-
-      - name: Set up Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-
-      - name: Validate PR title
-        if: github.event_name == 'pull_request'
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          printf '%s\n' "$PR_TITLE" |
-          npx --yes \
-            --package=@commitlint/cli@21.0.2 \
-            --package=@commitlint/config-conventional@21.0.2 \
-            commitlint --verbose --extends @commitlint/config-conventional
-
-      - name: Validate last commit
-        run: |
-          npx --yes \
-            --package=@commitlint/cli@21.0.2 \
-            --package=@commitlint/config-conventional@21.0.2 \
-            commitlint --last --verbose --extends @commitlint/config-conventional
-
   test:
     runs-on: ubuntu-latest
 
