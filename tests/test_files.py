@@ -32,7 +32,7 @@ class WriteServiceTests(unittest.TestCase):
     def test_copy_template_writes_strips_template_only_marker(self) -> None:
         template_root = Path("/templates")
         out_root = Path("/out")
-        self.fs.add_file(template_root / "src/server.ts", f"{TEMPLATE_TS_NOCHECK_MARKER}server\n")
+        self.fs.write_text(template_root / "src/server.ts", f"{TEMPLATE_TS_NOCHECK_MARKER}server\n")
 
         writes = self.writer.copy_template_writes(template_root, out_root)
 
@@ -43,11 +43,11 @@ class WriteServiceTests(unittest.TestCase):
     def test_copy_template_writes_overwrites_generated_scripts(self) -> None:
         template_root = Path("/templates")
         out_root = Path("/out")
-        self.fs.add_file(template_root / "scripts/codegen-admin-openapi.ts", "admin script\n")
-        self.fs.add_file(template_root / "scripts/lib/mockRuntimeCodegen.ts", "runtime script\n")
-        self.fs.add_file(template_root / "src/generated/mock-admin/state/controller.ts", "admin controller\n")
-        self.fs.add_file(template_root / "src/generated/mock-admin/state/repository.ts", "admin repository\n")
-        self.fs.add_file(template_root / "src/generated/mock-admin/state/service.ts", "admin service\n")
+        self.fs.write_text(template_root / "scripts/codegen-admin-openapi.ts", "admin script\n")
+        self.fs.write_text(template_root / "scripts/lib/mockRuntimeCodegen.ts", "runtime script\n")
+        self.fs.write_text(template_root / "src/generated/mock-admin/state/controller.ts", "admin controller\n")
+        self.fs.write_text(template_root / "src/generated/mock-admin/state/repository.ts", "admin repository\n")
+        self.fs.write_text(template_root / "src/generated/mock-admin/state/service.ts", "admin service\n")
 
         writes = self.writer.copy_template_writes(template_root, out_root)
         by_path = {write.path: write for write in writes}

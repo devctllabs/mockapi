@@ -27,10 +27,10 @@ class GeneratedQualityTests(unittest.TestCase):
         )
 
     def add_package_file(self, relative_path: str, content: str) -> None:
-        self.fs.add_file(PACKAGE_ROOT / relative_path, content)
+        self.fs.write_text(PACKAGE_ROOT / relative_path, content)
 
     def add_profile(self, profile: str) -> None:
-        self.fs.add_file(PROJECT_ROOT / ".mockapi/profile.toml", profile)
+        self.fs.write_text(PROJECT_ROOT / ".mockapi/profile.toml", profile)
 
     def test_errors_when_allocator_used_without_id_counters(self) -> None:
         self.add_package_file(
@@ -44,7 +44,7 @@ class GeneratedQualityTests(unittest.TestCase):
         self.assertIn("quality.idCounters.missingState", diagnostic_ids(result.errors))
 
     def test_accepts_allocator_when_generated_admin_state_declares_id_counters(self) -> None:
-        self.fs.add_file(PACKAGE_ROOT / "openapi/admin.yaml", "components:\n  schemas:\n    MockState:\n      properties:\n        idCounters: {}\n")
+        self.fs.write_text(PACKAGE_ROOT / "openapi/admin.yaml", "components:\n  schemas:\n    MockState:\n      properties:\n        idCounters: {}\n")
         self.add_package_file(
             "src/features/workspaces/service.ts",
             "const ids = newIdAllocator(state.getSlice('idCounters'))\n",
@@ -71,7 +71,7 @@ export const newApp = ({ basePath = "/api/v1" }: Options = {}) => {
 
     def test_forgives_malformed_profile_and_still_checks_files(self) -> None:
         profile_path = PROJECT_ROOT / ".mockapi/profile.toml"
-        self.fs.add_file(profile_path, "schemaVersion =")
+        self.fs.write_text(profile_path, "schemaVersion =")
         self.add_package_file(
             "src/app.ts",
             """type Options = { basePath?: string }
@@ -87,7 +87,7 @@ export const newApp = ({ basePath = "/api/v1" }: Options = {}) => {
         self.assertIn("quality.basePath.ignoredOption", diagnostic_ids(result.errors))
 
     def test_errors_when_final_admin_openapi_contains_external_refs(self) -> None:
-        self.fs.add_file(
+        self.fs.write_text(
             PACKAGE_ROOT / "openapi/admin.yaml",
             """openapi: 3.1.0
 components:
@@ -103,7 +103,7 @@ components:
         self.assertIn("quality.adminOpenapi.externalRefs", diagnostic_ids(result.errors))
 
     def test_allows_external_refs_in_admin_openapi_source(self) -> None:
-        self.fs.add_file(
+        self.fs.write_text(
             PACKAGE_ROOT / "openapi/admin.source.yaml",
             """openapi: 3.1.0
 components:
@@ -186,7 +186,7 @@ export const seedShared = (): Pick<MockState, "idCounters"> => ({ idCounters: {}
         self.assertIn("quality.stateAccess.directSliceAccess", diagnostic_ids(result.errors))
 
     def test_accepts_direct_id_counter_slice_access_in_feature_behavior(self) -> None:
-        self.fs.add_file(PACKAGE_ROOT / "openapi/admin.yaml", "idCounters: {}\n")
+        self.fs.write_text(PACKAGE_ROOT / "openapi/admin.yaml", "idCounters: {}\n")
         self.add_package_file(
             "src/features/workspaces/service.ts",
             "const ids = newIdAllocator(stateRepository.getSlice('idCounters'))\n",
@@ -198,7 +198,7 @@ export const seedShared = (): Pick<MockState, "idCounters"> => ({ idCounters: {}
         self.assertNotIn("quality.idCounters.missingState", diagnostic_ids(result.errors))
 
     def test_accepts_clear_style_service_and_repository(self) -> None:
-        self.fs.add_file(PACKAGE_ROOT / "openapi/admin.yaml", "idCounters: {}\n")
+        self.fs.write_text(PACKAGE_ROOT / "openapi/admin.yaml", "idCounters: {}\n")
         self.add_package_file(
             "src/features/workspaces/seed.ts",
             """import type { MockState } from '../../generated/mock-admin/contract/index.ts'

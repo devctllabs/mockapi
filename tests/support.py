@@ -29,16 +29,13 @@ class MemoryFileSystem(FileSystem):
         self.files: dict[str, str] = {}
         self.directories: set[str] = set()
 
-    def add_file(self, path: Path, content: str) -> None:
-        key = self._key(path)
-        self._add_parent_directories(Path(key))
-        self.files[key] = content
-
     def read_text(self, path: Path) -> str:
         return self.files[self._key(path)]
 
     def write_text(self, path: Path, content: str) -> None:
-        self.add_file(path, content)
+        key = self._key(path)
+        self._add_parent_directories(Path(key))
+        self.files[key] = content
 
     def is_file(self, path: Path) -> bool:
         return self._key(path) in self.files
@@ -79,9 +76,10 @@ components:
 """
 
 
-def profile_toml() -> str:
+def profile_toml(*, openapi_path: str = "openapi.yaml") -> str:
+    openapi_value = json.dumps(openapi_path)
     return textwrap.dedent(
-        """\
+        f"""\
         schemaVersion = 1
 
         [generator]
@@ -98,7 +96,7 @@ def profile_toml() -> str:
 
         [[apis]]
         name = "product-api"
-        openapi = "openapi.yaml"
+        openapi = {openapi_value}
         basePath = "/api/v1"
 
         [[features]]
@@ -141,7 +139,7 @@ def default_behavior() -> str:
     )
 
 
-def seed_runtime_templates(fs: MemoryFileSystem) -> None:
+def seed_runtime_templates(fs: FileSystem) -> None:
     templates = {
         "app.ts.tpl": "{{STARTER_HEADER}}\nconst basePath = {{DEFAULT_BASE_PATH}}\n{{RUNTIME_IMPORTS}}\n{{ROUTE_REGISTRATIONS}}\n",
         "codegen-mock-runtime.ts.tpl": "{{GENERATED_HEADER}}\nexport const runtimeConfigs = [\n{{RUNTIME_CONFIGS}}\n]\n",
@@ -184,26 +182,28 @@ def seed_runtime_templates(fs: MemoryFileSystem) -> None:
         ),
     }
     for name, content in templates.items():
-        fs.add_file(TEMPLATE_ROOT / name, content)
-    fs.add_file(
+        fs.write_text(TEMPLATE_ROOT / name, content)
+    fs.write_text(
         ADMIN_OPENAPI_TEMPLATE_PATH,
         "openapi: 3.1.0\ninfo:\n  title: __MOCKAPI_ADMIN_API_TITLE__\npaths:\n  /__mock/health:\n    get: {}\ncomponents:\n  schemas:\n    MockClock:\n      type: object\n      required: [now]\n      properties:\n        now:\n          type: string\n          format: date-time\n__MOCKAPI_ADMIN_MOCK_STATE_SCHEMAS__\n",
     )
 
 
-def seed_skill_template(fs: MemoryFileSystem) -> None:
-    fs.add_file(SKILL_ROOT / "SKILL.md", "# Mockapi\n")
-    fs.add_file(
+def seed_skill_template(fs: FileSystem) -> None:
+    fs.write_text(SKILL_ROOT / "SKILL.md", "# Mockapi\n")
+    fs.write_text(
         SKILL_ROOT / "assets/templates/mock-server/package.json",
         json.dumps(
             {
                 "name": "__MOCKAPI_PACKAGE_NAME__",
                 "scripts": {
+                    "build": "node scripts/build.mjs",
                     "codegen": "tsx scripts/codegen-admin-openapi.ts && openapi-ts && tsx scripts/codegen-mock-runtime.ts",
                     "codegen:contract": "tsx scripts/codegen-admin-openapi.ts && openapi-ts",
                     "test": "vitest run",
                 },
                 "devDependencies": {
+                    "esbuild": "^0.28.0",
                     "vitest": "^4.1.4",
                 },
             },
@@ -211,12 +211,37 @@ def seed_skill_template(fs: MemoryFileSystem) -> None:
         )
         + "\n",
     )
-    fs.add_file(SKILL_ROOT / "assets/templates/mock-server/.gitignore", ".mockapi-runtime/\n")
-    fs.add_file(
+    fs.write_text(SKILL_ROOT / "assets/templates/mock-server/.gitignore", ".mockapi-runtime/\ndist/\n")
+    fs.write_text(
         SKILL_ROOT / "assets/templates/mock-server/vitest.config.ts",
         "export default { test: { environment: 'node', globals: true } }\n",
     )
-    fs.add_file(
+    fs.write_text(
+        SKILL_ROOT / "assets/templates/mock-server/scripts/build.mjs",
+        (
+            "import { rm } from 'node:fs/promises'\n"
+            "import path from 'node:path'\n"
+            "import { fileURLToPath } from 'node:url'\n"
+            "\n"
+            "import { build } from 'esbuild'\n"
+            "\n"
+            "const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')\n"
+            "const distRoot = path.join(packageRoot, 'dist')\n"
+            "\n"
+            "await rm(distRoot, { recursive: true, force: true })\n"
+            "\n"
+            "await build({\n"
+            "  bundle: true,\n"
+            "  entryPoints: [path.join(packageRoot, 'src/server.ts')],\n"
+            "  format: 'esm',\n"
+            "  outfile: path.join(distRoot, 'server.js'),\n"
+            "  platform: 'node',\n"
+            "  sourcemap: true,\n"
+            "  target: 'node20',\n"
+            "})\n"
+        ),
+    )
+    fs.write_text(
         SKILL_ROOT / "assets/templates/mock-server/scripts/codegen-admin-openapi.ts",
         (
             "// @ts-nocheck -- mockapi template source; stripped during generation\n"
@@ -226,7 +251,7 @@ def seed_skill_template(fs: MemoryFileSystem) -> None:
             "admin codegen\n"
         ),
     )
-    fs.add_file(
+    fs.write_text(
         SKILL_ROOT / "assets/templates/mock-server/scripts/lib/mockRuntimeCodegen.ts",
         (
             "// @ts-nocheck -- mockapi template source; stripped during generation\n"
@@ -241,7 +266,7 @@ def seed_skill_template(fs: MemoryFileSystem) -> None:
         "src/generated/mock-admin/state/repository.ts": "admin repository\n",
         "src/generated/mock-admin/state/service.ts": "admin service\n",
     }.items():
-        fs.add_file(
+        fs.write_text(
             SKILL_ROOT / f"assets/templates/mock-server/{path}",
             (
                 "// @ts-nocheck -- mockapi template source; stripped during generation\n"
@@ -251,14 +276,14 @@ def seed_skill_template(fs: MemoryFileSystem) -> None:
                 f"{body}"
             ),
         )
-    fs.add_file(
+    fs.write_text(
         SKILL_ROOT / "assets/templates/mock-server/src/server.ts",
         "// @ts-nocheck -- mockapi template source; stripped during generation\nserver\n",
     )
 
 
 def write_project(
-    fs: MemoryFileSystem,
+    fs: FileSystem,
     *,
     root: Path = PROJECT_ROOT,
     profile: str | None = None,
@@ -266,10 +291,10 @@ def write_project(
     openapi: str | None = SIMPLE_OPENAPI,
 ) -> Path:
     if openapi is not None:
-        fs.add_file(root / "openapi.yaml", openapi)
+        fs.write_text(root / "openapi.yaml", openapi)
     profile_path = root / ".mockapi/profile.toml"
-    fs.add_file(profile_path, profile or profile_toml())
-    fs.add_file(root / ".mockapi/behavior.md", behavior or default_behavior())
+    fs.write_text(profile_path, profile or profile_toml())
+    fs.write_text(root / ".mockapi/behavior.md", behavior or default_behavior())
     return profile_path
 
 
@@ -283,7 +308,7 @@ def seed_openapi_fixture(fs: FileSystem, *, root: Path = PROJECT_ROOT, fixture_r
 
 
 def create_generator(
-    fs: MemoryFileSystem,
+    fs: FileSystem,
     *,
     command_runner: CommandRunner | None = None,
     env: dict[str, str] | None = None,

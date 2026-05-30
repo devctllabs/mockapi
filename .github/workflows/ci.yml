@@ -14,6 +14,45 @@ permissions:
   contents: read
 
 jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enforce single-commit PRs
+        if: github.event_name == 'pull_request'
+        env:
+          PR_COMMIT_COUNT: ${{ github.event.pull_request.commits }}
+        run: |
+          test "$PR_COMMIT_COUNT" -eq 1
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Validate PR title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s\n' "$PR_TITLE" |
+          npx --yes \
+            --package=@commitlint/cli@21.0.2 \
+            --package=@commitlint/config-conventional@21.0.2 \
+            commitlint --verbose --extends @commitlint/config-conventional
+
+      - name: Validate last commit
+        run: |
+          npx --yes \
+            --package=@commitlint/cli@21.0.2 \
+            --package=@commitlint/config-conventional@21.0.2 \
+            commitlint --last --verbose --extends @commitlint/config-conventional
+
   test:
     runs-on: ubuntu-latest
 
@@ -28,3 +67,45 @@ jobs:
 
       - name: Run tests
         run: python -m unittest discover -s tests -t .
+
+  generated-server:
+    runs-on: ubuntu-latest
+    env:
+      FIXTURE_ROOT: ${{ github.workspace }}/.tmp/mockapi-generated-server
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: "11"
+
+      - name: Prepare generated server fixture
+        run: python .github/scripts/prepare_generated_server_fixture.py --root "$FIXTURE_ROOT"
+
+      - name: Run generate.py with codegen
+        run: |
+          python skills/mockapi/scripts/generate.py \
+            --root "$FIXTURE_ROOT" \
+            --profile .mockapi/profile.toml \
+            --run-codegen
+
+      - name: Run package check
+        working-directory: ${{ env.FIXTURE_ROOT }}/mock-server
+        run: pnpm check
+
+      - name: Run package build
+        working-directory: ${{ env.FIXTURE_ROOT }}/mock-server
+        run: pnpm build

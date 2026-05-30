@@ -125,7 +125,7 @@ class RenderServiceTests(unittest.TestCase):
 
     def test_project_renderer_errors_when_admin_template_lacks_placeholder(self) -> None:
         bad_template = Path("/runtime/bad-admin.yaml")
-        self.fs.add_file(bad_template, "openapi: 3.1.0\n")
+        self.fs.write_text(bad_template, "openapi: 3.1.0\n")
         profile = profile_model(
             """\
             schemaVersion = 1
@@ -266,7 +266,7 @@ class RenderServiceTests(unittest.TestCase):
         profile = profile_model(profile_toml())
         context = create_generate_context(profile, PROJECT_ROOT)
         feature_root = PROJECT_ROOT / "mock-server/src/features/workspaces"
-        self.fs.add_file(feature_root / "controllers/listWorkspaces.ts", "// custom\n")
+        self.fs.write_text(feature_root / "controllers/listWorkspaces.ts", "// custom\n")
 
         writes = FeatureRenderService(self.fs, self.template_service).planned_writes(context)
 
@@ -299,7 +299,7 @@ class RenderServiceTests(unittest.TestCase):
         profile = profile_model(profile_toml())
         context = create_generate_context(profile, PROJECT_ROOT)
         feature_root = PROJECT_ROOT / "mock-server/src/features/workspaces"
-        self.fs.add_file(feature_root / "seed.ts", "// custom seed\n")
+        self.fs.write_text(feature_root / "seed.ts", "// custom seed\n")
 
         writes = FeatureRenderService(self.fs, self.template_service).planned_writes(context)
 

@@ -227,8 +227,8 @@ class ValidationTests(unittest.TestCase):
 
     def test_profile_only_skips_sidecars(self) -> None:
         profile_path = PROJECT_ROOT / ".mockapi/profile.toml"
-        self.fs.add_file(PROJECT_ROOT / "openapi.yaml", "openapi: 3.1.0\ninfo: {}\npaths: {}\ncomponents:\n  schemas:\n    Workspace: {}\n")
-        self.fs.add_file(profile_path, profile_toml())
+        self.fs.write_text(PROJECT_ROOT / "openapi.yaml", "openapi: 3.1.0\ninfo: {}\npaths: {}\ncomponents:\n  schemas:\n    Workspace: {}\n")
+        self.fs.write_text(profile_path, profile_toml())
 
         result = self.validator.validate(profile_path, root=Path("."), cwd=PROJECT_ROOT, profile_only=True)
 
@@ -236,8 +236,8 @@ class ValidationTests(unittest.TestCase):
 
     def test_errors_for_missing_sidecar_files(self) -> None:
         profile_path = PROJECT_ROOT / ".mockapi/profile.toml"
-        self.fs.add_file(PROJECT_ROOT / "openapi.yaml", "openapi: 3.1.0\ninfo: {}\npaths: {}\ncomponents:\n  schemas:\n    Workspace: {}\n")
-        self.fs.add_file(profile_path, profile_toml())
+        self.fs.write_text(PROJECT_ROOT / "openapi.yaml", "openapi: 3.1.0\ninfo: {}\npaths: {}\ncomponents:\n  schemas:\n    Workspace: {}\n")
+        self.fs.write_text(profile_path, profile_toml())
 
         result = self.validator.validate(profile_path, root=Path("."), cwd=PROJECT_ROOT)
 
@@ -246,7 +246,7 @@ class ValidationTests(unittest.TestCase):
 
     def test_parse_failure_returns_profile_parse_error(self) -> None:
         profile_path = PROJECT_ROOT / ".mockapi/profile.toml"
-        self.fs.add_file(profile_path, "schemaVersion =")
+        self.fs.write_text(profile_path, "schemaVersion =")
 
         result = self.validator.validate(profile_path, cwd=PROJECT_ROOT)
 
@@ -264,8 +264,8 @@ class ValidationTests(unittest.TestCase):
             "operations": [],
         }
         profile_path = PROJECT_ROOT / ".mockapi/profile.json"
-        self.fs.add_file(profile_path, json.dumps(profile))
-        self.fs.add_file(PROJECT_ROOT / ".mockapi/behavior.md", "# Behavior\n")
+        self.fs.write_text(profile_path, json.dumps(profile))
+        self.fs.write_text(PROJECT_ROOT / ".mockapi/behavior.md", "# Behavior\n")
 
         result = self.validator.validate(profile_path, root=Path("."), cwd=PROJECT_ROOT)
 
@@ -273,7 +273,7 @@ class ValidationTests(unittest.TestCase):
 
     def test_errors_for_non_object_json_profile(self) -> None:
         profile_path = PROJECT_ROOT / ".mockapi/profile.json"
-        self.fs.add_file(profile_path, "[]")
+        self.fs.write_text(profile_path, "[]")
 
         result = self.validator.validate(profile_path, cwd=PROJECT_ROOT)
 
@@ -282,7 +282,7 @@ class ValidationTests(unittest.TestCase):
 
     def test_errors_for_missing_required_profile_fields(self) -> None:
         profile_path = PROJECT_ROOT / ".mockapi/profile.toml"
-        self.fs.add_file(profile_path, "schemaVersion = 2\n")
+        self.fs.write_text(profile_path, "schemaVersion = 2\n")
 
         result = self.validator.validate(profile_path, cwd=PROJECT_ROOT)
 
@@ -347,7 +347,7 @@ class ValidationTests(unittest.TestCase):
             'recordType = "Workspace"\nschemaRef = "product-api:./domains/workspaces.yaml#/components/schemas/Workspace"\n',
         )
         profile_path = write_project(self.fs, profile=profile)
-        self.fs.add_file(
+        self.fs.write_text(
             PROJECT_ROOT / "domains/workspaces.yaml",
             "components:\n  schemas:\n    Workspace:\n      type: object\n",
         )
@@ -359,7 +359,7 @@ class ValidationTests(unittest.TestCase):
     def test_accepts_state_slice_schema_ref_with_json_openapi(self) -> None:
         profile = profile_toml().replace('openapi = "openapi.yaml"', 'openapi = "openapi.json"')
         profile_path = write_project(self.fs, profile=profile, openapi=None)
-        self.fs.add_file(PROJECT_ROOT / "openapi.json", '{"components":{"schemas":{"Workspace":{"type":"object"}}}}')
+        self.fs.write_text(PROJECT_ROOT / "openapi.json", '{"components":{"schemas":{"Workspace":{"type":"object"}}}}')
 
         result = self.validator.validate(profile_path, root=Path("."), cwd=PROJECT_ROOT)
 

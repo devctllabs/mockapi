@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node scripts/build.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
     "codegen": "tsx scripts/codegen-admin-openapi.ts && openapi-ts && tsx scripts/codegen-mock-runtime.ts",
     "codegen:contract": "tsx scripts/codegen-admin-openapi.ts && openapi-ts",
@@ -20,6 +20,7 @@
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.97.1",
     "@types/node": "^20.0.0",
+    "esbuild": "^0.28.0",
     "tsx": "^4.21.0",
     "typescript": "^5.0.0",
     "vitest": "^4.1.4",

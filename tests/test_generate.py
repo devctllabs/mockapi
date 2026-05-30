@@ -132,7 +132,7 @@ class GenerateTests(unittest.TestCase):
         profile_path = write_project(
             self.fs,
             openapi=None,
-            profile=profile_toml().replace('openapi = "openapi.yaml"', 'openapi = "openapi/openapi.yaml"'),
+            profile=profile_toml(openapi_path="openapi/openapi.yaml"),
             behavior=default_behavior(),
         )
 
@@ -221,8 +221,8 @@ class GenerateTests(unittest.TestCase):
         feature_root = PROJECT_ROOT / "mock-server/src/features/workspaces"
         repository_path = feature_root / "repository.ts"
         seed_path = feature_root / "seed.ts"
-        self.fs.add_file(repository_path, "// custom repository\n")
-        self.fs.add_file(seed_path, "// custom seed\n")
+        self.fs.write_text(repository_path, "// custom repository\n")
+        self.fs.write_text(seed_path, "// custom seed\n")
 
         result = self.generator.generate(root=PROJECT_ROOT, profile_path=".mockapi/profile.toml")
 
@@ -238,10 +238,10 @@ class GenerateTests(unittest.TestCase):
         repository_path = PROJECT_ROOT / "mock-server/src/generated/mock-admin/state/repository.ts"
         service_path = PROJECT_ROOT / "mock-server/src/generated/mock-admin/state/service.ts"
         seed_path = PROJECT_ROOT / "mock-server/src/generated/mock-admin/state/seed.ts"
-        self.fs.add_file(controller_path, "// custom admin controller\n")
-        self.fs.add_file(repository_path, "// custom admin repository\n")
-        self.fs.add_file(service_path, "// custom admin service\n")
-        self.fs.add_file(seed_path, "// custom admin seed\n")
+        self.fs.write_text(controller_path, "// custom admin controller\n")
+        self.fs.write_text(repository_path, "// custom admin repository\n")
+        self.fs.write_text(service_path, "// custom admin service\n")
+        self.fs.write_text(seed_path, "// custom admin seed\n")
 
         result = self.generator.generate(root=PROJECT_ROOT, profile_path=".mockapi/profile.toml")
 
@@ -261,8 +261,8 @@ class GenerateTests(unittest.TestCase):
         write_project(self.fs)
         admin_script_path = PROJECT_ROOT / "mock-server/scripts/codegen-admin-openapi.ts"
         runtime_script_path = PROJECT_ROOT / "mock-server/scripts/lib/mockRuntimeCodegen.ts"
-        self.fs.add_file(admin_script_path, "old admin script\n")
-        self.fs.add_file(runtime_script_path, "old runtime script\n")
+        self.fs.write_text(admin_script_path, "old admin script\n")
+        self.fs.write_text(runtime_script_path, "old runtime script\n")
 
         result = self.generator.generate(root=PROJECT_ROOT, profile_path=".mockapi/profile.toml")
 
@@ -280,9 +280,9 @@ class GenerateTests(unittest.TestCase):
         legacy_controller = "export const createWorkspacesController = () => ({ listWorkspaces: () => ({}) })\n"
         legacy_service = "export class WorkspacesService {}\n"
         legacy_operation = "export const createListWorkspacesController = () => ({})\n"
-        self.fs.add_file(feature_root / "controller.ts", legacy_controller)
-        self.fs.add_file(feature_root / "service.ts", legacy_service)
-        self.fs.add_file(feature_root / "operations/listWorkspaces.ts", legacy_operation)
+        self.fs.write_text(feature_root / "controller.ts", legacy_controller)
+        self.fs.write_text(feature_root / "service.ts", legacy_service)
+        self.fs.write_text(feature_root / "operations/listWorkspaces.ts", legacy_operation)
 
         result = self.generator.generate(root=PROJECT_ROOT, profile_path=".mockapi/profile.toml")
 
@@ -301,7 +301,7 @@ class GenerateTests(unittest.TestCase):
         write_project(self.fs)
         service_path = PROJECT_ROOT / "mock-server/src/features/workspaces/services/listWorkspaces.ts"
         custom_service = "// user edit\n"
-        self.fs.add_file(service_path, custom_service)
+        self.fs.write_text(service_path, custom_service)
 
         result = self.generator.generate(root=PROJECT_ROOT, profile_path=".mockapi/profile.toml")
 
@@ -362,6 +362,7 @@ class GenerateTests(unittest.TestCase):
         self.assertTrue(result.ok)
         payload = json.loads(self.fs.read_text(PROJECT_ROOT / "mock-server/package.json"))
         self.assertEqual(payload["name"], "@local/mock-server")
+        self.assertEqual(payload["scripts"]["build"], "node scripts/build.mjs")
         self.assertEqual(
             payload["scripts"]["codegen"],
             "tsx scripts/codegen-admin-openapi.ts && openapi-ts && tsx scripts/codegen-mock-runtime.ts",
@@ -371,7 +372,9 @@ class GenerateTests(unittest.TestCase):
             "tsx scripts/codegen-admin-openapi.ts && openapi-ts",
         )
         self.assertEqual(payload["scripts"]["test"], "vitest run")
+        self.assertEqual(payload["devDependencies"]["esbuild"], "^0.28.0")
         self.assertEqual(payload["devDependencies"]["vitest"], "^4.1.4")
+        self.assertTrue(self.fs.read_text(PROJECT_ROOT / "mock-server/scripts/build.mjs").startswith("import { rm } from 'node:fs/promises'"))
         self.assertEqual(
             self.fs.read_text(PROJECT_ROOT / "mock-server/scripts/codegen-admin-openapi.ts"),
             f"{GENERATED_SCRIPT_HEADER}admin codegen\n",
@@ -381,7 +384,7 @@ class GenerateTests(unittest.TestCase):
             f"{GENERATED_SCRIPT_HEADER}runtime codegen\n",
         )
         self.assertEqual(self.fs.read_text(PROJECT_ROOT / "mock-server/src/server.ts"), "server\n")
-        self.assertEqual(self.fs.read_text(PROJECT_ROOT / "mock-server/.gitignore"), ".mockapi-runtime/\n")
+        self.assertEqual(self.fs.read_text(PROJECT_ROOT / "mock-server/.gitignore"), ".mockapi-runtime/\ndist/\n")
         self.assertEqual(
             self.fs.read_text(PROJECT_ROOT / "mock-server/vitest.config.ts"),
             "export default { test: { environment: 'node', globals: true } }\n",
@@ -390,7 +393,7 @@ class GenerateTests(unittest.TestCase):
     def test_existing_vitest_config_is_not_rewritten(self) -> None:
         write_project(self.fs)
         config_path = PROJECT_ROOT / "mock-server/vitest.config.ts"
-        self.fs.add_file(config_path, "// custom vitest config\n")
+        self.fs.write_text(config_path, "// custom vitest config\n")
 
         result = self.generator.generate(root=PROJECT_ROOT, profile_path=".mockapi/profile.toml")
 
@@ -400,7 +403,7 @@ class GenerateTests(unittest.TestCase):
 
     def test_skill_root_service_uses_env_then_errors_when_missing(self) -> None:
         fs = MemoryFileSystem()
-        fs.add_file(Path("/env-skill/SKILL.md"), "# Skill\n")
+        fs.write_text(Path("/env-skill/SKILL.md"), "# Skill\n")
 
         discovered = SkillRootService(fs, env={"MOCKAPI_SKILL_ROOT": "/env-skill"}, script_root=Path("/missing"), cwd=Path("/cwd")).discover()
 
@@ -488,7 +491,7 @@ class GenerateTests(unittest.TestCase):
         write_project(self.fs)
         package_root = PROJECT_ROOT / "mock-server"
         workspace_path = package_root / "pnpm-workspace.yaml"
-        self.fs.add_file(workspace_path, "packages:\n  - .\n")
+        self.fs.write_text(workspace_path, "packages:\n  - .\n")
 
         result = generator.generate(root=PROJECT_ROOT, profile_path=".mockapi/profile.toml", run_codegen=True)
 
