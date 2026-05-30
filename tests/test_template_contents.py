@@ -29,6 +29,7 @@ class TemplateContentTests(unittest.TestCase):
         gitignore = read_template(".gitignore")
 
         self.assertIn(".mockapi-runtime/", gitignore)
+        self.assertIn("dist/", gitignore)
 
     def test_id_allocator_uses_new_constructor_name(self) -> None:
         ids = read_template("src/lib/ids.ts")

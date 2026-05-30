@@ -82,8 +82,8 @@ components:
         fs = MemoryFileSystem()
         yaml_path = Path("/api/openapi.yaml")
         json_path = Path("/api/openapi.json")
-        fs.add_file(yaml_path, "components:\n  schemas:\n    Workspace: {}\n")
-        fs.add_file(json_path, '{"components":{"schemas":{"Folder":{}}}}')
+        fs.write_text(yaml_path, "components:\n  schemas:\n    Workspace: {}\n")
+        fs.write_text(json_path, '{"components":{"schemas":{"Folder":{}}}}')
 
         self.assertTrue(document_key_path_exists(fs, yaml_path, ("components", "schemas", "Workspace")))
         self.assertTrue(document_key_path_exists(fs, json_path, ("components", "schemas", "Folder")))

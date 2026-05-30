@@ -34,7 +34,7 @@ class TemplateTests(unittest.TestCase):
     def test_template_service_reads_named_template_from_fs(self) -> None:
         fs = MemoryFileSystem()
         template_root = Path("/templates")
-        fs.add_file(template_root / "hello.tpl", "hello {{NAME}}")
+        fs.write_text(template_root / "hello.tpl", "hello {{NAME}}")
 
         rendered = TemplateService(fs, template_root).render("hello.tpl", {"NAME": "mockapi"})
 

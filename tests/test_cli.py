@@ -102,7 +102,7 @@ class CliTests(unittest.TestCase):
         profile_path = write_project(
             fs,
             openapi=None,
-            profile=profile_toml().replace('openapi = "openapi.yaml"', 'openapi = "openapi/openapi.yaml"'),
+            profile=profile_toml(openapi_path="openapi/openapi.yaml"),
             behavior=default_behavior(),
         )
         stdout = io.StringIO()
@@ -170,7 +170,7 @@ class CliTests(unittest.TestCase):
 
     def test_check_generated_quality_main_outputs_json_for_failure(self) -> None:
         fs = MemoryFileSystem()
-        fs.add_file(
+        fs.write_text(
             PROJECT_ROOT / "mock-server/src/features/workspaces/controllers/listWorkspaces.ts",
             "throw new Error('TODO mockapi: implement listWorkspaces')\n",
         )
@@ -195,11 +195,11 @@ class CliTests(unittest.TestCase):
     def test_check_generated_quality_main_forwards_profile_path(self) -> None:
         fs = MemoryFileSystem()
         profile_path = PROJECT_ROOT / ".mockapi/profile.toml"
-        fs.add_file(
+        fs.write_text(
             profile_path,
             profile_toml().replace("[state]\nschemaVersion = 1", "[state]\nschemaVersion = 1\nseed = false"),
         )
-        fs.add_file(
+        fs.write_text(
             PROJECT_ROOT / "mock-server/src/features/workspaces/seed.ts",
             "import type { MockState } from '../../generated/mock-admin/contract/index.ts'\n"
             "export const seedWorkspaces = (): Pick<MockState, 'workspaces'> => ({ workspaces: [] })\n",
