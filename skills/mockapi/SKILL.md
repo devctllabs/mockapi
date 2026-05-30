@@ -88,9 +88,9 @@ run unbundled scripts.
   behavior from the matching `behavior.md` anchor, not from operation shape.
 - Use `reference/sidecars.md` for sidecar shape and validation expectations.
 - Use `reference/generated-server.md`, `reference/mock-server-structure.md`,
-  `reference/mock-server-examples.md`, `reference/seed-data.md`, and
-  `reference/mock-server-quality.md` when inspecting or finishing generated
-  server code.
+  `reference/mock-server-examples.md`, `reference/seed-data.md`,
+  `reference/testing.md`, and `reference/mock-server-quality.md` when
+  inspecting or finishing generated server code.
 
 ## Bundled Scripts
 

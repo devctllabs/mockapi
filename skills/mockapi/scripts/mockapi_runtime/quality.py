@@ -191,6 +191,37 @@ def _is_feature_seed(relative: str) -> bool:
     return relative.startswith("src/features/") and relative.endswith("/seed.ts")
 
 
+def _is_test_file(relative: str) -> bool:
+    return TEST_FILE_PATTERN.search(Path(relative).name) is not None
+
+
+def _is_feature_unit_source(relative: str) -> bool:
+    if not relative.startswith("src/features/"):
+        return False
+    if _is_test_file(relative) or _is_feature_seed(relative) or "/controllers/" in relative:
+        return False
+    if relative.endswith(".d.ts"):
+        return False
+    if Path(relative).name in {"index.ts", "types.ts"}:
+        return False
+    return True
+
+
+def _adjacent_unit_test_candidates(relative: str) -> list[str]:
+    source_path = Path(relative)
+    extensions = [source_path.suffix]
+    extensions.extend(
+        extension
+        for extension in (".ts", ".tsx", ".mts", ".cts")
+        if extension != source_path.suffix
+    )
+    return [
+        (source_path.parent / f"{source_path.stem}{kind}{extension}").as_posix()
+        for kind in (".test", ".spec")
+        for extension in extensions
+    ]
+
+
 def _feature_has_completed_behavior(source_files: list[ScannedFile], feature: str) -> bool:
     service_relative = f"src/features/{feature}/service.ts"
     if any(scanned_file.relative == service_relative for scanned_file in source_files):
@@ -487,6 +518,31 @@ def _check_smoke_tests(context: QualityScanContext, warnings: list[Diagnostic]) 
         )
 
 
+def _check_feature_unit_tests(context: QualityScanContext, warnings: list[Diagnostic]) -> None:
+    test_relatives = {scanned_file.relative for scanned_file in context.test_files}
+
+    for scanned_file in context.source_files:
+        if not _is_feature_unit_source(scanned_file.relative):
+            continue
+        if TODO_PATTERN.search(scanned_file.text):
+            continue
+
+        candidates = _adjacent_unit_test_candidates(scanned_file.relative)
+        if any(candidate in test_relatives for candidate in candidates):
+            continue
+
+        warnings.append(
+            _diagnostic(
+                "quality.tests.missingFeatureUnit",
+                (
+                    "Completed LLM-owned feature source has no adjacent unit test; "
+                    f"add {candidates[0]} or report the uncovered behavior as residual risk."
+                ),
+                path=candidates[0],
+            )
+        )
+
+
 def check_generated_quality(
     fs: FileSystem,
     package_root: Path,
@@ -509,6 +565,7 @@ def check_generated_quality(
     _check_snapshot_set_all(context, warnings)
     _check_unsafe_casts(context, warnings)
     _check_smoke_tests(context, warnings)
+    _check_feature_unit_tests(context, warnings)
 
     return QualityCheckResult(errors=errors, warnings=warnings)
 

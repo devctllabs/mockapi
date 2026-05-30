@@ -1,10 +1,10 @@
 # Mock Server Quality Gate
 
 Use this reference after `generate.py --run-codegen` and after completing
-LLM-owned `src/features/**`, `src/controllers.ts`, seed data, and smoke tests.
-This is a final handoff gate, not a scaffold scope probe. A freshly generated
-scaffold is expected to fail because operation adapters start as TODOs and
-feature seed stubs start empty.
+LLM-owned `src/features/**`, `src/controllers.ts`, seed data, adjacent feature
+unit tests, and smoke tests. This is a final handoff gate, not a scaffold scope
+probe. A freshly generated scaffold is expected to fail because operation
+adapters start as TODOs and feature seed stubs start empty.
 
 ## Required Checks
 
@@ -94,12 +94,19 @@ when appropriate.
 The quality checker reports `quality.seed.emptyProductSeed` for empty product
 seed literals while seed data is enabled.
 
-## Minimum Smoke Coverage
+## Test Coverage
 
 Generated packages use Vitest. Keep HTTP smoke tests in `src/app.test.ts` by
-default. Use `src/config.test.ts` only for config/env resolution, and use
-`src/features/<feature>/<feature>.test.ts` only when a feature workflow is too
-large for the app-level smoke file.
+default. Use `src/config.test.ts` only for config/env resolution. Add adjacent
+unit tests for completed LLM-owned feature behavior:
+
+- `src/features/<feature>/service.test.ts` for `service.ts`
+- `src/features/<feature>/repository.test.ts` for `repository.ts`
+- `src/features/<feature>/<helper>.test.ts` for feature-local helpers
+
+Do not unit-test generated thin operation controller adapters by default. Add an
+adjacent controller test only when the adapter performs non-trivial request
+normalization or branching not covered by service or app smoke tests.
 
 Before handoff, add `src/app.test.ts` coverage for:
 

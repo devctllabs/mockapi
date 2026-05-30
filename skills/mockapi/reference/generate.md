@@ -128,8 +128,9 @@ nvm-managed Node installations and corepack for pnpm/Yarn.
 
 7. After codegen succeeds, read `reference/mock-server-structure.md`,
    `reference/mock-server-examples.md`, `reference/seed-data.md`,
-   `reference/mock-server-quality.md`, `.mockapi/behavior.md`, generated
-   `src/generated/**`, `src/controllers.ts`, and `src/features/**`. Create
+   `reference/testing.md`, `reference/mock-server-quality.md`,
+   `.mockapi/behavior.md`, generated `src/generated/**`,
+   `src/controllers.ts`, and `src/features/**`. Create
    feature-local `service.ts` when behavior needs orchestration. Create
    feature-local `repository.ts` for every completed feature that owns
    non-infrastructure state slices; `idCounters` alone does not need a
@@ -160,6 +161,12 @@ nvm-managed Node installations and corepack for pnpm/Yarn.
    explicit behavior opt-in. Allocate IDs once per transaction and pass the
    allocator into helpers that need additional IDs. Do not infer behavior from
    operation shape when the anchor has open questions.
+   Add adjacent Vitest unit tests for completed LLM-owned feature behavior:
+   `service.test.ts` next to `service.ts`, `repository.test.ts` next to
+   `repository.ts`, and `<helper>.test.ts` next to feature-local domain helpers.
+   Keep generated operation controller adapter tests out of scope unless an
+   adapter contains non-trivial normalization. Keep HTTP workflow smoke tests in
+   `src/app.test.ts`.
 
 ### Final Verification
 
@@ -167,8 +174,8 @@ nvm-managed Node installations and corepack for pnpm/Yarn.
    `packageManager.commands.check` from the generator JSON in `packageRoot`.
    Then run the generated package `test` script, if present. Generated mock
    server templates include Vitest by default; put HTTP smoke tests in
-   `src/app.test.ts`, config/env tests in `src/config.test.ts`, and only split
-   large feature workflows into `src/features/<feature>/<feature>.test.ts`.
+   `src/app.test.ts`, config/env tests in `src/config.test.ts`, and unit tests
+   for feature behavior beside the source files they cover.
    Then run the final quality checker:
 
 ```bash
