@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="version 0.1.0" src="https://img.shields.io/badge/version-0.1.0-2f6f5e?style=flat-square">
+  <img alt="build status" src="https://img.shields.io/github/actions/workflow/status/devctllabs/mockapi/ci.yml?branch=main&style=flat-square&color=339933">
   <img alt="license Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-4a5568?style=flat-square">
   <img alt="node &gt;=22" src="https://img.shields.io/badge/node-%3E%3D22-339933?style=flat-square&amp;logo=node.js&amp;logoColor=white">
   <img alt="python &gt;=3.11" src="https://img.shields.io/badge/python-%3E%3D3.11-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white">
