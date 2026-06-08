@@ -46,8 +46,8 @@ class WriteServiceTests(unittest.TestCase):
         self.fs.write_text(template_root / "scripts/codegen-admin-openapi.ts", "admin script\n")
         self.fs.write_text(template_root / "scripts/lib/mockRuntimeCodegen.ts", "runtime script\n")
         self.fs.write_text(template_root / "src/generated/mock-admin/state/controller.ts", "admin controller\n")
-        self.fs.write_text(template_root / "src/generated/mock-admin/state/repository.ts", "admin repository\n")
         self.fs.write_text(template_root / "src/generated/mock-admin/state/service.ts", "admin service\n")
+        self.fs.write_text(template_root / "src/lib/stateStore.ts", "state store\n")
 
         writes = self.writer.copy_template_writes(template_root, out_root)
         by_path = {write.path: write for write in writes}
@@ -55,8 +55,8 @@ class WriteServiceTests(unittest.TestCase):
         self.assertTrue(by_path[out_root / "scripts/codegen-admin-openapi.ts"].overwrite)
         self.assertTrue(by_path[out_root / "scripts/lib/mockRuntimeCodegen.ts"].overwrite)
         self.assertTrue(by_path[out_root / "src/generated/mock-admin/state/controller.ts"].overwrite)
-        self.assertTrue(by_path[out_root / "src/generated/mock-admin/state/repository.ts"].overwrite)
         self.assertTrue(by_path[out_root / "src/generated/mock-admin/state/service.ts"].overwrite)
+        self.assertFalse(by_path[out_root / "src/lib/stateStore.ts"].overwrite)
 
 
 class LocalFileSystemTests(unittest.TestCase):

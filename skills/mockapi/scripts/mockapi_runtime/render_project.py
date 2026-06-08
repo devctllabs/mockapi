@@ -119,6 +119,10 @@ def yaml_key(value: str) -> str:
     return value if re.match(r"^[A-Za-z_][A-Za-z0-9_-]*$", value) else quote(value)
 
 
+def ts_property_key(value: str) -> str:
+    return value if re.match(r"^[A-Za-z_$][A-Za-z0-9_$]*$", value) else quote(value)
+
+
 def indent_block(text: str, spaces: int) -> str:
     prefix = " " * spaces
     return "\n".join(f"{prefix}{line}" if line else line for line in text.splitlines())
@@ -301,13 +305,13 @@ def render_app(profile: Profile, template_service: TemplateService) -> str:
     registrations = "\n".join(
         [
             """  registerGeneratedMockRoutes(app, {
-    controllers,
+    controllers: mockControllers,
     runtime: adminRuntime,
   })""",
             *[
                 f"""  registerGeneratedMockRoutes(app, {{
     basePath: {"basePath" if uses_base_path_option else quote(api.basePath or "")},
-    controllers,
+    controllers: mockControllers,
     runtime: {to_camel_case(api.name)}Runtime,
   }})"""
                 for api in profile.apis
@@ -418,6 +422,95 @@ def render_state_seed(profile: Profile, template_service: TemplateService) -> st
     )
 
 
+def entity_state_slices(profile: Profile) -> list[ProfileStateSlice]:
+    return [
+        state_slice
+        for state_slice in profile.state.slices
+        if state_slice.array is not False
+        and state_slice.idField
+        and schema_ref_parts(profile, state_slice) is not None
+    ]
+
+
+def render_state_store(profile: Profile, template_service: TemplateService) -> str:
+    entity_slices = entity_state_slices(profile)
+    entity_names = [state_slice.name for state_slice in entity_slices]
+    meta_names = [state_slice.name for state_slice in profile.state.slices if state_slice.name not in set(entity_names)]
+
+    zod_import = ""
+    if entity_slices:
+        zod_names = ",\n  ".join(f"z{state_type_name(state_slice)}" for state_slice in entity_slices)
+        zod_import = f"""import {{
+  {zod_names},
+}} from '../generated/mock-admin/contract/zod.gen.ts'
+"""
+
+    entity_union = " | ".join(quote(name) for name in entity_names) if entity_names else "never"
+    entity_record_map = (
+        "\n".join(
+            f"  {ts_property_key(state_slice.name)}: MockState[{quote(state_slice.name)}][number]"
+            for state_slice in entity_slices
+        )
+        if entity_slices
+        else "  [key: string]: never"
+    )
+    entity_keys = (
+        "\n".join(f"  {quote(name)}," for name in entity_names)
+        if entity_names
+        else ""
+    )
+    entity_id_fields = (
+        "\n".join(f"  {ts_property_key(state_slice.name)}: {quote(state_slice.idField or 'id')}," for state_slice in entity_slices)
+        if entity_slices
+        else ""
+    )
+    entity_collections = (
+        "\n".join(
+            f"  {ts_property_key(state_slice.name)}: new Collection({{ schema: z{state_type_name(state_slice)} }}),"
+            for state_slice in entity_slices
+        )
+        if entity_slices
+        else ""
+    )
+    meta_properties = "\n".join(
+        [
+            "  schemaVersion: state.schemaVersion,",
+            "  clock: clone(state.clock),",
+            *[f"  {ts_property_key(name)}: clone(state[{quote(name)}])," for name in meta_names],
+        ]
+    )
+    snapshot_properties = "\n".join(
+        [
+            "      schemaVersion: this.meta.schemaVersion,",
+            "      clock: clone(this.meta.clock),",
+            *[
+                f"      {ts_property_key(state_slice.name)}: "
+                + (
+                    f"this.entitySnapshot({quote(state_slice.name)}),"
+                    if state_slice.name in entity_names
+                    else f"clone(this.meta[{quote(state_slice.name)}]),"
+                )
+                for state_slice in profile.state.slices
+            ],
+        ]
+    )
+
+    return template_service.render(
+        "state-store.ts.tpl",
+        {
+            "ENTITY_COLLECTIONS": entity_collections,
+            "ENTITY_ID_FIELDS": entity_id_fields,
+            "ENTITY_KEYS": entity_keys,
+            "ENTITY_RECORD_MAP": entity_record_map,
+            "ENTITY_UNION": entity_union,
+            "META_PROPERTIES": meta_properties,
+            "SNAPSHOT_PROPERTIES": snapshot_properties,
+            "STARTER_HEADER": STARTER_HEADER,
+            "ZOD_IMPORT": zod_import,
+        },
+    )
+
+
 class ProjectRenderService:
     def __init__(
         self,
@@ -450,5 +543,6 @@ class ProjectRenderService:
             ),
             planned_write(out_root / "src/app.ts", render_app(profile, self.template_service), overwrite=False),
             planned_write(out_root / "src/controllers.ts", render_controllers(context, self.template_service), overwrite=False),
+            planned_write(out_root / "src/lib/stateStore.ts", render_state_store(profile, self.template_service), overwrite=False),
             planned_write(out_root / "src/generated/mock-admin/state/seed.ts", render_state_seed(profile, self.template_service), overwrite=True),
         ]

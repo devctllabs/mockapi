@@ -10,6 +10,7 @@ For compact implementation examples, read `reference/mock-server-examples.md`.
 src/
   app.ts
   controllers.ts
+  dependencies.ts
   features/
     <feature>/
       service.ts
@@ -19,26 +20,32 @@ src/
   generated/
     mock-admin/state/
       controller.ts
-      repository.ts
       seed.ts
       service.ts
   lib/
+    stateStore.ts
+    nodeStateStore.ts
+    browserStateStore.ts
 ```
 
 `src/lib` is for product-agnostic infrastructure helpers only. Keep generated
-template-style utilities there, such as clone, errors, request context, IDs,
-soft delete, and sorting. Product/domain helpers belong under
+template-style utilities there, such as the `@msw/data`-backed state store,
+Node/browser persistence adapters, clone, errors, request context, IDs, soft
+delete, and sorting. Product/domain helpers belong under
 `src/features/<feature>/...`; for cross-feature derived behavior, create a
 small named feature service or resolver rather than a broad `src/lib/tree.ts`
 or `src/lib/domain.ts`.
 
-`src/generated/mock-admin/state/repository.ts` is the low-level in-memory state
-store. It owns snapshot persistence, reset, clock helpers, transactions, and
-typed `getSlice` / `setSlice` access.
+`src/lib/stateStore.ts` is the low-level in-memory state store. It uses
+`@msw/data` collections for entity array slices with an `idField`, owns reset,
+clock helpers, transactions, and typed entity/slice access. `nodeStateStore.ts`
+hydrates/persists JSON snapshots on disk; `browserStateStore.ts` hydrates and
+persists snapshots in `localStorage`.
 
-`src/controllers.ts` is the composition root. Instantiate feature repositories
-there from the shared `MockStateRepository`, add them to `MockApiDependencies`,
-and pass `deps` into operation controller and service factories.
+`src/dependencies.ts` is the feature composition root. Instantiate feature
+repositories there from the shared `MockStateStore`, add services to
+`MockApiDependencies`, and pass `deps` into operation controller factories from
+`src/controllers.ts`.
 
 `src/generated/mock-admin/state/**` is generated admin infrastructure. Do not
 edit those files by hand; use feature modules for behavior and feature seed
@@ -97,11 +104,13 @@ state slice to exactly one feature in `profile.toml`. See
 ## Behavior Implementation
 
 Feature services orchestrate behavior. Use feature repositories for domain
-reads and writes. Use `MockStateRepository` directly only for cross-feature
+reads and writes. Use `MockStateStore` directly only for cross-feature
 transactions, mock clock helpers, ID counters, snapshot-level operations, or
 other infrastructure behavior. Read-only composite services, such as search,
-should consume other feature repositories instead of calling `getSlice` or
-`setSlice` on product slices directly.
+should consume other feature repositories instead of calling state-store methods
+on product slices directly. Wrap mutating workflows in
+`await stateStore.transaction(async () => ...)` so snapshot persistence runs
+after the complete workflow.
 
 Repositories own collection mutation. Services should call named repository
 methods such as `create`, `update`, `markDeleted`, `restore`, `remove`,

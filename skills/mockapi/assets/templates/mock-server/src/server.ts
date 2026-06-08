@@ -6,8 +6,8 @@ import { readMockServerConfig } from './config.ts'
 import { newMockApiControllers } from './controllers.ts'
 
 const config = readMockServerConfig()
-const app = newMockApiApp({
-  controllers: newMockApiControllers({
+const app = await newMockApiApp({
+  controllers: await newMockApiControllers({
     stateFile: config.stateFile,
   }),
 })

@@ -141,14 +141,26 @@ def default_behavior() -> str:
 
 def seed_runtime_templates(fs: FileSystem) -> None:
     templates = {
-        "app.ts.tpl": "{{STARTER_HEADER}}\nconst basePath = {{DEFAULT_BASE_PATH}}\n{{RUNTIME_IMPORTS}}\n{{ROUTE_REGISTRATIONS}}\n",
+        "app.ts.tpl": (
+            "{{STARTER_HEADER}}\n"
+            "const basePath = {{DEFAULT_BASE_PATH}}\n"
+            "const mockControllers = controllers ?? await newMemoryMockApiControllers()\n"
+            "{{RUNTIME_IMPORTS}}\n"
+            "{{ROUTE_REGISTRATIONS}}\n"
+        ),
         "codegen-mock-runtime.ts.tpl": "{{GENERATED_HEADER}}\nexport const runtimeConfigs = [\n{{RUNTIME_CONFIGS}}\n]\n",
         "controllers.ts.tpl": (
             "{{STARTER_HEADER}}\n{{PRODUCT_IMPORTS}}\n{{OPERATION_IMPORTS}}\n"
-            "export type MockApiDependencies = { state: unknown }\n"
+            "import { newMockApiDependencies, type MockApiDependencies } from './dependencies.ts'\n"
+            "import { newFileMockStateStore, type MockStateOptions } from './lib/nodeStateStore.ts'\n"
+            "export type { MockApiDependencies }\n"
             "const operationCount = {{OPERATION_COUNT}}\n"
-            "export const newMockApiControllers = (deps: MockApiDependencies): {{PRODUCT_TYPES}} => ({\n"
+            "export const newMockApiControllers = async (_options: MockStateOptions = {}): Promise<{{PRODUCT_TYPES}}> => {\n"
+            "const stateStore = await newFileMockStateStore(_options)\n"
+            "const deps = newMockApiDependencies(stateStore)\n"
+            "return {\n"
             "{{CONTROLLER_SPREADS}}\n})\n"
+            "}\n"
         ),
         "openapi-ts.config.ts.tpl": "{{GENERATED_HEADER}}\nexport default [\n{{CONFIGS}}\n]\n",
         "operation-controller.ts.tpl": (
@@ -180,6 +192,18 @@ def seed_runtime_templates(fs: FileSystem) -> None:
             "  }\n"
             "}\n"
         ),
+        "state-store.ts.tpl": (
+            "{{STARTER_HEADER}}"
+            "import { Collection } from '@msw/data'\n"
+            "{{ZOD_IMPORT}}"
+            "export type EntitySliceKey = {{ENTITY_UNION}}\n"
+            "type EntityRecordMap = {\n{{ENTITY_RECORD_MAP}}\n}\n"
+            "const entitySliceKeys = [\n{{ENTITY_KEYS}}\n]\n"
+            "const entityIdFields = {\n{{ENTITY_ID_FIELDS}}\n}\n"
+            "const newEntityCollections = () => ({\n{{ENTITY_COLLECTIONS}}\n})\n"
+            "{{META_PROPERTIES}}\n"
+            "{{SNAPSHOT_PROPERTIES}}\n"
+        ),
     }
     for name, content in templates.items():
         fs.write_text(TEMPLATE_ROOT / name, content)
@@ -196,11 +220,18 @@ def seed_skill_template(fs: FileSystem) -> None:
         json.dumps(
             {
                 "name": "__MOCKAPI_PACKAGE_NAME__",
+                "exports": {
+                    "./browser": "./src/browser.ts",
+                    "./package.json": "./package.json",
+                },
                 "scripts": {
                     "build": "node scripts/build.mjs",
                     "codegen": "tsx scripts/codegen-admin-openapi.ts && openapi-ts && tsx scripts/codegen-mock-runtime.ts",
                     "codegen:contract": "tsx scripts/codegen-admin-openapi.ts && openapi-ts",
                     "test": "vitest run",
+                },
+                "dependencies": {
+                    "@msw/data": "1.1.6",
                 },
                 "devDependencies": {
                     "esbuild": "^0.28.0",
@@ -263,8 +294,11 @@ def seed_skill_template(fs: FileSystem) -> None:
     )
     for path, body in {
         "src/generated/mock-admin/state/controller.ts": "admin controller\n",
-        "src/generated/mock-admin/state/repository.ts": "admin repository\n",
         "src/generated/mock-admin/state/service.ts": "admin service\n",
+        "src/dependencies.ts": "dependencies\n",
+        "src/lib/nodeStateStore.ts": "node state store\n",
+        "src/lib/browserStateStore.ts": "browser state store\n",
+        "src/browser.ts": "browser entry\n",
     }.items():
         fs.write_text(
             SKILL_ROOT / f"assets/templates/mock-server/{path}",

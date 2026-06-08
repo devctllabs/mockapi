@@ -12,7 +12,6 @@ OVERWRITABLE_TEMPLATE_PATHS = frozenset(
         "scripts/codegen-admin-openapi.ts",
         "scripts/lib/mockRuntimeCodegen.ts",
         "src/generated/mock-admin/state/controller.ts",
-        "src/generated/mock-admin/state/repository.ts",
         "src/generated/mock-admin/state/service.ts",
     }
 )

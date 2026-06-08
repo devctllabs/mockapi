@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
@@ -23,7 +24,22 @@ class TemplateContentTests(unittest.TestCase):
     def test_server_logs_state_snapshot_path(self) -> None:
         server = read_template("src/server.ts")
 
+        self.assertIn("const app = await newMockApiApp", server)
+        self.assertIn("controllers: await newMockApiControllers", server)
         self.assertIn("State snapshot: ${config.stateFile}", server)
+
+    def test_package_exports_browser_state_store_entrypoint(self) -> None:
+        package = json.loads(read_template("package.json"))
+
+        self.assertEqual(package["dependencies"]["@msw/data"], "1.1.6")
+        self.assertEqual(package["exports"]["./browser"], "./src/browser.ts")
+
+    def test_browser_entrypoint_exports_browser_store(self) -> None:
+        browser = read_template("src/browser.ts")
+
+        self.assertIn("newBrowserMockStateStore", browser)
+        self.assertIn("newMockApiDependencies", browser)
+        self.assertIn("zMockState", browser)
 
     def test_template_ignores_runtime_state_directory(self) -> None:
         gitignore = read_template(".gitignore")

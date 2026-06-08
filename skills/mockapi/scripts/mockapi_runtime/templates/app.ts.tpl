@@ -18,11 +18,12 @@ export type NewMockApiAppOptions = {
   controllers?: MockApiControllers
 }
 
-export const newMockApiApp = ({
+export const newMockApiApp = async ({
   basePath = {{DEFAULT_BASE_PATH}},
-  controllers = newMemoryMockApiControllers(),
+  controllers,
 }: NewMockApiAppOptions = {}) => {
   const app = new Hono()
+  const mockControllers = controllers ?? await newMemoryMockApiControllers()
 
   app.use('*', cors())
 {{ROUTE_REGISTRATIONS}}

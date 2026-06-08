@@ -18,6 +18,9 @@ HARDCODED_BASE_PATH_PATTERN = re.compile(r"\bbasePath\s*:\s*['\"]/")
 AS_ANY_PATTERN = re.compile(r"\bas\s+any\b")
 SLUG_ID_SOURCE_PATTERN = re.compile(r"\b(?:slugify|uniqueSlug)\b", re.IGNORECASE)
 DIRECT_SLICE_ACCESS_PATTERN = re.compile(r"\.(?:getSlice|setSlice)\(\s*(['\"])(?P<slice>[^'\"]+)\1")
+DIRECT_ENTITY_ACCESS_PATTERN = re.compile(
+    r"\.(?:findEntities|findEntity|createEntity|updateEntity|deleteEntity)\(\s*(['\"])(?P<slice>[^'\"]+)\1"
+)
 PICK_MOCK_STATE_PATTERN = re.compile(r"Pick<\s*MockState\s*,\s*(?P<keys>[^>]+)>", re.DOTALL)
 STRING_LITERAL_PATTERN = re.compile(r"['\"](?P<value>[^'\"]+)['\"]")
 EMPTY_LITERAL_CONTENT_PATTERN = r"(?:\s|//[^\n\r]*(?:\r?\n|$)|/\*.*?\*/)*"
@@ -457,6 +460,11 @@ def _check_direct_slice_access(context: QualityScanContext, errors: list[Diagnos
             {
                 match.group("slice")
                 for match in DIRECT_SLICE_ACCESS_PATTERN.finditer(scanned_file.text)
+                if match.group("slice") not in INFRASTRUCTURE_STATE_SLICES
+            }
+            | {
+                match.group("slice")
+                for match in DIRECT_ENTITY_ACCESS_PATTERN.finditer(scanned_file.text)
                 if match.group("slice") not in INFRASTRUCTURE_STATE_SLICES
             }
         )

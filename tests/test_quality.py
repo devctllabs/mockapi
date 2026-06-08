@@ -195,6 +195,17 @@ export const seedShared = (): Pick<MockState, "idCounters"> => ({ idCounters: {}
         self.assertFalse(result.ok)
         self.assertIn("quality.stateAccess.directSliceAccess", diagnostic_ids(result.errors))
 
+    def test_errors_for_direct_entity_store_access_in_feature_behavior(self) -> None:
+        self.add_package_file(
+            "src/features/workspaces/service.ts",
+            "const workspaces = stateStore.findEntities('workspaces')\nawait stateStore.createEntity('workspaces', workspace)\n",
+        )
+
+        result = self.check()
+
+        self.assertFalse(result.ok)
+        self.assertIn("quality.stateAccess.directSliceAccess", diagnostic_ids(result.errors))
+
     def test_accepts_direct_id_counter_slice_access_in_feature_behavior(self) -> None:
         self.fs.write_text(PACKAGE_ROOT / "openapi/admin.yaml", "idCounters: {}\n")
         self.add_package_file(
@@ -220,20 +231,20 @@ export const seedWorkspaces = (): Pick<MockState, 'workspaces'> => ({
         self.add_package_file(
             "src/features/workspaces/repository.ts",
             """export class WorkspaceRepository {
-  constructor(private readonly stateStore: MockStateRepository) {}
-  visible() { return this.stateStore.getSlice('workspaces') }
-  create(workspace: WorkspaceRecord) { this.stateStore.setSlice('workspaces', [workspace, ...this.visible()]) }
+  constructor(private readonly stateStore: MockStateStore) {}
+  visible() { return this.stateStore.findEntities('workspaces') }
+  create(workspace: WorkspaceRecord) { return this.stateStore.createEntity('workspaces', workspace, { prepend: true }) }
 }
 """,
         )
         self.add_package_file(
             "src/features/workspaces/service.ts",
             """export class WorkspaceService {
-  constructor(private readonly stateStore: MockStateRepository, private readonly workspaces: WorkspaceRepository) {}
+  constructor(private readonly stateStore: MockStateStore, private readonly workspaces: WorkspaceRepository) {}
   create(draft: WorkspaceDraft) {
-    return this.stateStore.transaction(() => {
+    return this.stateStore.transaction(async () => {
       const ids = newIdAllocator(this.stateStore.getSlice('idCounters'))
-      this.workspaces.create({ ...draft, id: ids.next('workspace'), updatedAt: this.stateStore.now() })
+      await this.workspaces.create({ ...draft, id: ids.next('workspace'), updatedAt: this.stateStore.now() })
     })
   }
 }

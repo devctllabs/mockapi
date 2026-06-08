@@ -43,14 +43,15 @@ is validated by `validate_profile.py`.
 ## Architecture Signals
 
 Keep state access feature-local. Use feature repositories for reads, writes,
-and selectors over owned slices. Use `MockStateRepository` directly only for
+and selectors over owned slices. Use `MockStateStore` directly only for
 transactions, mock clock, ID counters, admin-like snapshot operations, or
 cross-feature orchestration.
 
 Every completed feature that owns non-infrastructure product state slices must
 have `src/features/<feature>/repository.ts`. `idCounters` is infrastructure and
 does not require a feature repository by itself. Feature services and operation
-controllers must not call `getSlice` or `setSlice` on product state slices
+controllers must not call `getSlice`, `setSlice`, `findEntities`, `findEntity`,
+`createEntity`, `updateEntity`, or `deleteEntity` on product state slices
 directly; keep those calls inside feature repositories.
 
 Repositories should expose named mutations and selectors. Feature services

@@ -11,6 +11,8 @@ Write unit tests beside the feature source file they cover:
 - `src/features/<feature>/service.test.ts` for `service.ts`
 - `src/features/<feature>/repository.test.ts` for `repository.ts`
 - `src/features/<feature>/<helper>.test.ts` for feature-local domain helpers
+- `src/lib/stateStore.test.ts` when changing the generated `@msw/data` store or
+  persistence adapters
 
 Unit-test completed LLM-owned behavior, not deterministic generated scaffold.
 Do not add tests for generated TODO adapters or thin operation controllers by
