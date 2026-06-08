@@ -129,15 +129,15 @@ nvm-managed Node installations and corepack for pnpm/Yarn.
 7. After codegen succeeds, read `reference/mock-server-structure.md`,
    `reference/mock-server-examples.md`, `reference/seed-data.md`,
    `reference/testing.md`, `reference/mock-server-quality.md`,
-   `.mockapi/behavior.md`, generated `src/generated/**`,
+   `.mockapi/behavior.md`, generated `src/generated/**`, `src/dependencies.ts`,
    `src/controllers.ts`, and `src/features/**`. Create
    feature-local `service.ts` when behavior needs orchestration. Create
    feature-local `repository.ts` for every completed feature that owns
    non-infrastructure state slices; `idCounters` alone does not need a
    repository. Replace generated product seed stub defaults unless
    `.mockapi/profile.toml` sets `state.seed = false`. Extend
-   `MockApiDependencies` in `src/controllers.ts`, instantiate
-   repositories/services from the shared `MockStateRepository`, and pass
+   `MockApiDependencies` in `src/dependencies.ts`, instantiate
+   repositories/services from the shared `MockStateStore`, and pass
    dependencies into operation controllers through `deps`. Keep feature seed
    data in `src/features/<feature>/seed.ts`; generated
    `src/generated/mock-admin/state/seed.ts` will aggregate feature seed
@@ -151,10 +151,12 @@ nvm-managed Node installations and corepack for pnpm/Yarn.
    mutations such as `create`/`update`/`markDeleted`/`restore`, and avoid
    service-facing `setAll`, `setItems`, or `replaceAll` APIs.
    Do not create a single shared product repository. Services may use
-   `MockStateRepository` directly for transactions, mock clock helpers,
+   `MockStateStore` directly for transactions, mock clock helpers,
    `idCounters`, and cross-repository coordination only; product state reads and
    writes go through feature repositories. Read-only composite features should
-   consume other feature repositories instead of raw state slices. Keep operation
+   consume other feature repositories instead of raw state slices. Wrap mutating
+   workflows in `await stateStore.transaction(async () => ...)` and await
+   repository mutations inside the transaction. Keep operation
    controllers thin; do not put data-access logic there. Replace controller
    TODOs from the matching behavior anchors. Use counter IDs with `idCounters`
    and `newIdAllocator` by default for create operations; slug-style IDs require
@@ -202,11 +204,13 @@ incomplete.
 - OpenAPI runtime/config files and `src/generated/mock-admin/state/**` may be
   overwritten.
 - Template scaffolds such as `src/app.ts`, `src/server.ts`,
-  `src/controllers.ts`, and `src/lib/**` are create-only.
-- `src/controllers.ts` is the LLM-owned composition root for DI and route
-  controller wiring. If the profile API set changes after initial generation,
-  update `src/app.ts` registrations manually as part of the same LLM-owned
-  wiring pass.
+  `src/controllers.ts`, `src/dependencies.ts`, and `src/lib/**` are
+  create-only.
+- `src/dependencies.ts` is the LLM-owned composition root for feature
+  repositories and services. `src/controllers.ts` is the LLM-owned route
+  controller aggregation and admin wiring file. If the profile API set changes
+  after initial generation, update `src/app.ts` registrations manually as part
+  of the same LLM-owned wiring pass.
 - `src/features/**` is reviewable behavior. Generation creates missing
   operation controller TODO adapters and create-only seed stubs for owned state
   slices. Feature services and repositories are LLM-owned and created only when

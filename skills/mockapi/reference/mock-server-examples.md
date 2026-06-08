@@ -42,16 +42,16 @@ inside the repository.
 
 ## Composition Root
 
-Create dependencies once in `src/controllers.ts`: state store first, then
-repositories, derived resolvers, services, and operation controllers.
+Create dependencies once in `src/dependencies.ts`: state store first, then
+repositories, derived resolvers, and services. `src/controllers.ts` creates the
+store, calls `newMockApiDependencies(stateStore)`, and aggregates operation
+controllers.
 
 ```ts
-const stateRepository = new MockStateRepository(options)
-
-const workspacesRepository = new WorkspaceRepository(stateRepository)
-const foldersRepository = new FolderRepository(stateRepository)
-const decksRepository = new DeckRepository(stateRepository)
-const trashRepository = new TrashRepository(stateRepository)
+const workspacesRepository = new WorkspaceRepository(stateStore)
+const foldersRepository = new FolderRepository(stateStore)
+const decksRepository = new DeckRepository(stateStore)
+const trashRepository = new TrashRepository(stateStore)
 
 const locationPathResolver = new LocationPathResolver(
   decksRepository,
@@ -62,14 +62,14 @@ const locationPathResolver = new LocationPathResolver(
 const folderService = new FolderService(
   foldersRepository,
   locationPathResolver,
-  stateRepository,
+  stateStore,
   workspacesRepository,
   trashRepository,
 )
 
 const deps: MockApiDependencies = {
   folderService,
-  stateRepository,
+  stateStore,
 }
 ```
 
@@ -85,18 +85,18 @@ entire array, modify it, and write it back.
 
 ```ts
 import { notFound } from '../../generated/product-api/mock-runtime.ts'
-import type { MockStateRepository } from '../../generated/mock-admin/state/repository.ts'
 import type { MockState } from '../../generated/mock-admin/contract/index.ts'
+import type { MockStateStore } from '../../lib/stateStore.ts'
 import { sortByPreference, type SortPreference } from '../../lib/sort.ts'
 import { visible } from '../../lib/softDelete.ts'
 
 type FolderRecord = MockState['folders'][number]
 
 export class FolderRepository {
-  constructor(private readonly stateStore: MockStateRepository) {}
+  constructor(private readonly stateStore: MockStateStore) {}
 
   all() {
-    return this.stateStore.getSlice('folders')
+    return this.stateStore.findEntities('folders')
   }
 
   visible() {
@@ -104,7 +104,7 @@ export class FolderRepository {
   }
 
   find(folderId: string) {
-    return this.all().find((folder) => folder.id === folderId)
+    return this.stateStore.findEntity('folders', folderId)
   }
 
   require(folderId: string, options: { includeDeleted?: boolean } = {}) {
@@ -118,35 +118,29 @@ export class FolderRepository {
     return folder
   }
 
-  create(folder: FolderRecord) {
-    this.stateStore.setSlice('folders', [folder, ...this.all()])
+  async create(folder: FolderRecord) {
+    return this.stateStore.createEntity('folders', folder, { prepend: true })
   }
 
-  update(folderId: string, updater: (folder: FolderRecord) => FolderRecord) {
-    let next: FolderRecord | undefined
-
-    this.stateStore.setSlice('folders', this.all().map((folder) => {
-      if (folder.id !== folderId) {
-        return folder
-      }
-
-      next = updater(folder)
-
-      return next
-    }))
-
-    return next ?? this.require(folderId)
+  async update(folderId: string, updater: (folder: FolderRecord) => FolderRecord) {
+    return (
+      await this.stateStore.updateEntity('folders', folderId, updater)
+    ) ?? this.require(folderId, { includeDeleted: true })
   }
 
-  markDeleted(folderId: string, deletedAt: string) {
+  async markDeleted(folderId: string, deletedAt: string) {
     return this.update(folderId, (folder) => ({ ...folder, deletedAt }))
   }
 
-  restore(folderId: string) {
+  async restore(folderId: string) {
     return this.update(folderId, (folder) => {
       const { deletedAt: _deletedAt, ...restored } = folder
       return restored
     })
+  }
+
+  async remove(folderId: string) {
+    return this.stateStore.deleteEntity('folders', folderId)
   }
 
   listByParent(workspaceId: string, parentId: string, sort?: SortPreference) {
@@ -170,12 +164,12 @@ raw `setItems` API:
 ```ts
 import { notFound } from '../../generated/product-api/mock-runtime.ts'
 import type { MockState } from '../../generated/mock-admin/contract/index.ts'
-import type { MockStateRepository } from '../../generated/mock-admin/state/repository.ts'
+import type { MockStateStore } from '../../lib/stateStore.ts'
 
 type TrashState = MockState['trash']
 
 export class TrashRepository {
-  constructor(private readonly stateStore: MockStateRepository) {}
+  constructor(private readonly stateStore: MockStateStore) {}
 
   get() {
     return this.stateStore.getSlice('trash')
@@ -191,26 +185,30 @@ export class TrashRepository {
     return item
   }
 
-  addItem(item: TrashState['items'][number]) {
+  async addItem(item: TrashState['items'][number]) {
     const trash = this.get()
 
-    this.stateStore.setSlice('trash', {
+    await this.stateStore.setSlice('trash', {
       ...trash,
       items: [item, ...trash.items.filter((candidate) => candidate.id !== item.id)],
     })
+
+    return this.get()
   }
 
-  removeItem(itemId: string) {
+  async removeItem(itemId: string) {
     const trash = this.get()
 
-    this.stateStore.setSlice('trash', {
+    await this.stateStore.setSlice('trash', {
       ...trash,
       items: trash.items.filter((item) => item.id !== itemId),
     })
+
+    return this.get()
   }
 
-  empty(lastEmptiedAt: string) {
-    this.stateStore.setSlice('trash', {
+  async empty(lastEmptiedAt: string) {
+    await this.stateStore.setSlice('trash', {
       items: [],
       lastEmptiedAt,
     })
@@ -233,7 +231,7 @@ import type {
 } from '../../generated/product-api/contract/index.ts'
 import { clone } from '../../lib/clone.ts'
 import { newIdAllocator } from '../../lib/ids.ts'
-import type { MockStateRepository } from '../../generated/mock-admin/state/repository.ts'
+import type { MockStateStore } from '../../lib/stateStore.ts'
 import type { LocationPathResolver } from '../location-path/resolver.ts'
 import type { TrashRepository } from '../trash/repository.ts'
 import type { WorkspaceRepository } from '../workspaces/repository.ts'
@@ -243,15 +241,15 @@ export class FolderService {
   constructor(
     private readonly folders: FolderRepository,
     private readonly paths: LocationPathResolver,
-    private readonly stateStore: MockStateRepository,
+    private readonly stateStore: MockStateStore,
     private readonly workspaces: WorkspaceRepository,
     private readonly trash: TrashRepository,
   ) {}
 
-  create(draft: FolderDraft): Folder {
+  async create(draft: FolderDraft): Promise<Folder> {
     const workspaceId = this.workspaceIdForParent(draft.parentId)
 
-    return this.stateStore.transaction(() => {
+    return this.stateStore.transaction(async () => {
       const ids = newIdAllocator(this.stateStore.getSlice('idCounters'))
       const folder: Folder = {
         ...draft,
@@ -260,49 +258,49 @@ export class FolderService {
         workspaceId,
       }
 
-      this.folders.create(folder)
-      this.workspaces.touch(workspaceId, this.stateStore.now())
+      await this.folders.create(folder)
+      await this.workspaces.touch(workspaceId, this.stateStore.now())
 
       return clone(folder)
     })
   }
 
-  update(folderId: string, draft: FolderDraft): Folder {
+  async update(folderId: string, draft: FolderDraft): Promise<Folder> {
     const current = this.folders.require(folderId)
     const workspaceId = this.workspaceIdForParent(draft.parentId)
 
-    return this.stateStore.transaction(() => {
-      const folder = this.folders.update(folderId, (existing) => ({
+    return this.stateStore.transaction(async () => {
+      const folder = await this.folders.update(folderId, (existing) => ({
         ...existing,
         ...draft,
         updatedAt: this.stateStore.now(),
         workspaceId,
       }))
 
-      this.workspaces.touch(workspaceId, this.stateStore.now())
+      await this.workspaces.touch(workspaceId, this.stateStore.now())
       if (current.workspaceId !== workspaceId) {
-        this.workspaces.touch(current.workspaceId, this.stateStore.now())
+        await this.workspaces.touch(current.workspaceId, this.stateStore.now())
       }
 
       return clone(folder)
     })
   }
 
-  delete(folderId: string) {
+  async delete(folderId: string) {
     const folder = this.folders.require(folderId)
 
-    this.stateStore.transaction(() => {
+    await this.stateStore.transaction(async () => {
       const deletedAt = this.stateStore.now()
 
-      this.folders.markDeleted(folderId, deletedAt)
-      this.trash.addItem({
+      await this.folders.markDeleted(folderId, deletedAt)
+      await this.trash.addItem({
         deletedAt,
         id: folder.id,
         kind: 'folder',
         locationPath: this.paths.folderContainerPathSegments(folder),
         title: folder.name,
       })
-      this.workspaces.touch(folder.workspaceId, deletedAt)
+      await this.workspaces.touch(folder.workspaceId, deletedAt)
     })
   }
 
@@ -330,7 +328,7 @@ this.folders.setAll([...folders, folder])
 Prefer a named repository mutation:
 
 ```ts
-this.folders.create(folder)
+await this.folders.create(folder)
 ```
 
 ## Soft Delete and Trash Flow
@@ -340,33 +338,33 @@ restore operations should go through the trash feature and call feature
 repository `restore` methods.
 
 ```ts
-delete(folderId: string) {
+async delete(folderId: string) {
   const folder = this.folders.require(folderId)
 
-  this.stateStore.transaction(() => {
+  await this.stateStore.transaction(async () => {
     const deletedAt = this.stateStore.now()
 
-    this.folders.markDeleted(folderId, deletedAt)
-    this.trash.addItem({
+    await this.folders.markDeleted(folderId, deletedAt)
+    await this.trash.addItem({
       deletedAt,
       id: folder.id,
       kind: 'folder',
       locationPath: this.paths.folderContainerPathSegments(folder),
       title: folder.name,
     })
-    this.workspaces.touch(folder.workspaceId, deletedAt)
+    await this.workspaces.touch(folder.workspaceId, deletedAt)
   })
 }
 
-restore(itemId: string) {
+async restore(itemId: string) {
   const item = this.trash.requireItem(itemId)
 
-  this.stateStore.transaction(() => {
+  await this.stateStore.transaction(async () => {
     if (item.kind === 'folder') {
-      this.folders.restore(itemId)
+      await this.folders.restore(itemId)
     }
 
-    this.trash.removeItem(itemId)
+    await this.trash.removeItem(itemId)
   })
 }
 ```
@@ -379,7 +377,7 @@ For example, when notes are created or deleted, update the owning deck through
 
 ```ts
 export class WorkspaceRepository {
-  touch(workspaceId: string, updatedAt: string) {
+  async touch(workspaceId: string, updatedAt: string) {
     return this.update(workspaceId, (workspace) => ({
       ...workspace,
       updatedAt,
@@ -388,7 +386,7 @@ export class WorkspaceRepository {
 }
 
 export class DeckRepository {
-  bumpTotalNotes(deckId: string, amount: number, updatedAt: string) {
+  async bumpTotalNotes(deckId: string, amount: number, updatedAt: string) {
     return this.update(deckId, (deck) => ({
       ...deck,
       totalNotes: Math.max(0, deck.totalNotes + amount),
@@ -398,15 +396,15 @@ export class DeckRepository {
 }
 
 export class NoteService {
-  create(draft: NoteDraft) {
+  async create(draft: NoteDraft) {
     const deck = this.decks.require(draft.deckId)
 
-    return this.stateStore.transaction(() => {
+    return this.stateStore.transaction(async () => {
       const note = this.buildNote(draft)
 
-      this.notes.create(note)
-      this.decks.bumpTotalNotes(draft.deckId, 1, this.stateStore.now())
-      this.workspaces.touch(deck.workspaceId, this.stateStore.now())
+      await this.notes.create(note)
+      await this.decks.bumpTotalNotes(draft.deckId, 1, this.stateStore.now())
+      await this.workspaces.touch(deck.workspaceId, this.stateStore.now())
 
       return clone({ id: note.id, deckId: note.deckId })
     })

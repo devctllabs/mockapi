@@ -29,7 +29,9 @@ Create-only scaffold:
 - `src/app.ts`
 - `src/server.ts`
 - `src/controllers.ts`
+- `src/dependencies.ts`
 - `src/lib/**`
+- `src/browser.ts`
 
 Reviewable behavior:
 
@@ -42,9 +44,9 @@ endpoint starters are written to:
 - `src/features/<feature>/controllers/<operationId>.ts`
 - `src/features/<feature>/seed.ts` for features that own state slices
 
-The controller file is a thin typed TODO adapter. Root `src/controllers.ts` is
-LLM-owned and must be updated when dependencies or operation wiring change after
-initial generation.
+The controller file is a thin typed TODO adapter. Root `src/controllers.ts` and
+`src/dependencies.ts` are LLM-owned and must be updated when dependencies,
+services, or operation wiring change after initial generation.
 
 `src/generated/mock-admin/state/**` is generated admin infrastructure. Do not
 edit it by hand; put seed data in feature seed files and behavior in feature
@@ -64,8 +66,9 @@ non-infrastructure product state slices must have a feature repository:
 - `src/features/<feature>/seed.ts`: create-only seed stub for
   `features[].stateSlices`; replace empty product defaults according to
   `reference/seed-data.md`.
-- `src/controllers.ts`: composition root that creates repositories and passes
-  them through `MockApiDependencies`.
+- `src/dependencies.ts`: composition root that creates repositories/services
+  from the shared `MockStateStore` and returns `MockApiDependencies`.
+- `src/controllers.ts`: route-controller aggregation and admin wiring.
 
 Keep product/domain helpers near their owning feature, for example
 `src/features/notes/noteDetails.ts` or
@@ -74,16 +77,18 @@ product-agnostic infrastructure helpers such as clone, errors, request context,
 IDs, soft delete, and sorting. Do not add product-domain modules such as
 `src/lib/notes.ts`, `src/lib/deckStats.ts`, or `src/lib/tree.ts`.
 
-`MockStateRepository` is the low-level in-memory state store. Feature
-repositories sit above it as domain slice facades. They use `getSlice` and
-`setSlice` to expose methods such as `all`, `visible`, `find`, `require`,
-`create`, `update`, `markDeleted`, `restore`, `remove`, and feature-specific
-selectors. Use `find` or `require` instead of `byId`; avoid service-facing
-`setAll`, `setItems`, or `replaceAll` feature APIs. Keep canonical state as
-arrays or singleton slices by default, not maps.
+`MockStateStore` is the low-level state store in `src/lib/stateStore.ts`. It
+uses `@msw/data` collections for entity array slices with an `idField`, and
+keeps singleton/meta slices as typed snapshot values. Feature repositories sit
+above it as domain slice facades. For entity slices, use `findEntities`,
+`findEntity`, `createEntity`, `updateEntity`, and `deleteEntity`; for singleton
+slices, use `getSlice` and `setSlice`. Expose methods such as `all`, `visible`,
+`find`, `require`, `create`, `update`, `markDeleted`, `restore`, `remove`, and
+feature-specific selectors. Use `find` or `require` instead of `byId`; avoid
+service-facing `setAll`, `setItems`, or `replaceAll` feature APIs.
 
 Feature services own orchestration. They must use feature repositories for
-domain resource reads and writes, but may use `MockStateRepository` directly for
+domain resource reads and writes, but may use `MockStateStore` directly for
 transaction boundaries, mock clock helpers, ID counters, and cross-repository
 coordination. Read-only composite services should consume other feature
 repositories instead of raw state slices. Services should call named repository
@@ -97,15 +102,15 @@ counter, and read-only composite examples, use `reference/mock-server-examples.m
 Example:
 
 ```ts
-import type { MockStateRepository } from '../../generated/mock-admin/state/repository.ts'
 import type { WorkspaceRecord } from '../../generated/mock-admin/contract/index.ts'
+import type { MockStateStore } from '../../lib/stateStore.ts'
 import { visible } from '../../lib/softDelete.ts'
 
 export class WorkspacesRepository {
-  constructor(private readonly stateStore: MockStateRepository) {}
+  constructor(private readonly stateStore: MockStateStore) {}
 
   all() {
-    return this.stateStore.getSlice('workspaces')
+    return this.stateStore.findEntities('workspaces')
   }
 
   visible() {
@@ -113,27 +118,26 @@ export class WorkspacesRepository {
   }
 
   find(workspaceId: string) {
-    return this.all().find((workspace) => workspace.id === workspaceId)
+    return this.stateStore.findEntity('workspaces', workspaceId)
   }
 
-  create(workspace: WorkspaceRecord) {
-    this.stateStore.setSlice('workspaces', [workspace, ...this.all()])
+  async create(workspace: WorkspaceRecord) {
+    return this.stateStore.createEntity('workspaces', workspace, { prepend: true })
   }
 }
 ```
 
-Wire repositories in `src/controllers.ts`:
+Wire repositories and services in `src/dependencies.ts`:
 
 ```ts
 export type MockApiDependencies = {
-  stateRepository: MockStateRepository
+  stateStore: MockStateStore
   workspacesRepository: WorkspacesRepository
 }
 
-const stateRepository = new MockStateRepository(options)
-const workspacesRepository = new WorkspacesRepository(stateRepository)
+const workspacesRepository = new WorkspacesRepository(stateStore)
 const deps: MockApiDependencies = {
-  stateRepository,
+  stateStore,
   workspacesRepository,
 }
 ```
@@ -206,6 +210,11 @@ package by default. Startup logs include the absolute path as
 `State snapshot: /full-path/to/mock-server/.mockapi-runtime/db.json`.
 Set `MOCK_API_STATE_FILE` to use a different snapshot file; relative override
 paths resolve from the generated package root.
+
+Generated packages also expose `./browser` from `package.json`. Use
+`@local/mock-server/browser` from UI, Storybook, or browser tests to create a
+`newBrowserMockStateStore({ storageKey })`, inspect `zMockState`, or build
+browser-local service dependencies without importing Node filesystem code.
 
 `openapi/admin.source.yaml` is generated from `.mockapi/profile.toml` and may
 contain external product schema refs. `scripts/codegen-admin-openapi.ts` runs

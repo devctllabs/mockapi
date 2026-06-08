@@ -74,6 +74,7 @@ class RenderServiceTests(unittest.TestCase):
         self.assertTrue(by_path["openapi-ts.config.ts"].overwrite)
         self.assertTrue(by_path["openapi/admin.source.yaml"].overwrite)
         self.assertFalse(by_path["src/app.ts"].overwrite)
+        self.assertFalse(by_path["src/lib/stateStore.ts"].overwrite)
         self.assertTrue(by_path["src/generated/mock-admin/state/seed.ts"].overwrite)
         self.assertNotIn("openapi/admin.yaml", by_path)
         self.assertNotIn("src/generated/mock-admin/state/types.ts", by_path)
@@ -89,6 +90,23 @@ class RenderServiceTests(unittest.TestCase):
         self.assertNotIn("mockStateSchemaVersion", by_path["src/generated/mock-admin/state/seed.ts"].content)
         self.assertIn('const basePath = "/api"', by_path["src/app.ts"].content)
         self.assertIn("basePath: basePath,", by_path["src/app.ts"].content)
+
+    def test_project_renderer_renders_msw_data_state_store_for_entity_slices(self) -> None:
+        profile = profile_model(profile_toml())
+        context = create_generate_context(profile, PROJECT_ROOT)
+
+        writes = ProjectRenderService(self.fs, self.template_service, ADMIN_OPENAPI_TEMPLATE_PATH).planned_writes(context)
+        state_store = {
+            write.path.relative_to(context.outRoot).as_posix(): write.content
+            for write in writes
+        }["src/lib/stateStore.ts"]
+
+        self.assertIn("import { Collection } from '@msw/data'", state_store)
+        self.assertIn("zWorkspaceRecord", state_store)
+        self.assertIn('export type EntitySliceKey = "workspaces"', state_store)
+        self.assertIn('workspaces: MockState["workspaces"][number]', state_store)
+        self.assertIn('workspaces: "id",', state_store)
+        self.assertIn("workspaces: new Collection({ schema: zWorkspaceRecord })", state_store)
 
     def test_project_renderer_uses_current_time_for_seed_now_default(self) -> None:
         profile = profile_model(profile_toml())

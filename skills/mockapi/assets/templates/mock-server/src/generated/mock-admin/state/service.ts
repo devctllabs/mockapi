@@ -3,11 +3,11 @@
 // Do not edit by hand.
 
 import type { MockClock, MockState } from '../contract/index.ts'
-import type { MockStateRepository } from './repository.ts'
+import type { MockStateStore } from '../../../lib/stateStore.ts'
 
 export class AdminStateService {
   constructor(
-    private readonly stateRepository: MockStateRepository,
+    private readonly stateStore: MockStateStore,
     private readonly operationCount: number,
   ) {}
 
@@ -19,26 +19,26 @@ export class AdminStateService {
   }
 
   reset() {
-    return this.stateRepository.reset()
+    return this.stateStore.reset()
   }
 
   getState() {
-    return this.stateRepository.snapshot()
+    return this.stateStore.snapshot()
   }
 
   replaceState(state: MockState) {
-    return this.stateRepository.replace(state)
+    return this.stateStore.replace(state)
   }
 
   snapshot() {
-    return this.stateRepository.snapshot()
+    return this.stateStore.snapshot()
   }
 
   putSnapshot(state: MockState) {
-    return this.stateRepository.replace(state)
+    return this.stateStore.replace(state)
   }
 
   setClock(clock: MockClock) {
-    return this.stateRepository.setClock(clock.now)
+    return this.stateStore.setClock(clock.now)
   }
 }
