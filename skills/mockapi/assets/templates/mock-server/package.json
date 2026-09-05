@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.4",
-    "@msw/data": "1.1.6",
+    "@msw/data": "1.1.8",
     "hono": "^4.10.7",
     "zod": "^4.3.6"
   },
